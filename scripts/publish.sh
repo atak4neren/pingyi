@@ -27,6 +27,8 @@ mkdir -p "$publish_dir/engine-host"
 cp -a "$engine_dir/." "$publish_dir/engine-host/"
 find "$publish_dir" -type f -name '*.pdb' -delete
 bash "$project_root/scripts/prepare-offline-models.sh" "${PINGYI_OFFLINE_MODEL_SOURCE:-}" "$publish_dir/offline-models"
+cp "$project_root/LICENSE" "$project_root/THIRD_PARTY_NOTICES.md" "$publish_dir/"
+"$engine_python" "$project_root/scripts/audit-release-dependencies.py" "$publish_dir"
 
 tar -C "$publish_dir" -czf "$project_root/artifacts/PingYi-$version-linux-x64.tar.gz" .
 

@@ -284,7 +284,8 @@ public sealed class PaddleOcrProvider(AppDataPaths paths) : IOcrProvider, IDispo
     private (string Text, double Confidence) RecognizeBox(SKBitmap source, PixelRect box)
     {
         const int targetHeight = 48;
-        const int targetWidth = 320;
+        const int minimumTargetWidth = 32;
+        const int maximumTargetWidth = 1600;
         using var cropped = new SKBitmap(box.Width, box.Height);
         using (var canvas = new SKCanvas(cropped))
         {
@@ -295,21 +296,30 @@ public sealed class PaddleOcrProvider(AppDataPaths paths) : IOcrProvider, IDispo
                 new SKRect(0, 0, box.Width, box.Height));
         }
 
-        var resizedWidth = Math.Clamp((int)Math.Ceiling((double)targetHeight * box.Width / box.Height), 1, targetWidth);
+        var idealWidth = Math.Max(1, (int)Math.Ceiling((double)targetHeight * box.Width / box.Height));
+        var targetWidth = Math.Clamp(
+            (int)Math.Ceiling(idealWidth / 32d) * 32,
+            minimumTargetWidth,
+            maximumTargetWidth);
+        var resizedWidth = Math.Min(idealWidth, targetWidth);
         using var resized = cropped.Resize(new SKImageInfo(resizedWidth, targetHeight), SKSamplingOptions.Default)
             ?? throw new ProviderException("ocr_resize_failed", "OCR 文字区域缩放失败。");
         var data = new float[3 * targetHeight * targetWidth];
         Array.Fill(data, 1f);
         var plane = targetHeight * targetWidth;
+        var invert = HasDarkBackground(cropped);
         for (var y = 0; y < targetHeight; y++)
         {
             for (var x = 0; x < resizedWidth; x++)
             {
                 var color = resized.GetPixel(x, y);
                 var index = y * targetWidth + x;
-                data[index] = color.Blue / 127.5f - 1f;
-                data[plane + index] = color.Green / 127.5f - 1f;
-                data[2 * plane + index] = color.Red / 127.5f - 1f;
+                var blue = invert ? 255 - color.Blue : color.Blue;
+                var green = invert ? 255 - color.Green : color.Green;
+                var red = invert ? 255 - color.Red : color.Red;
+                data[index] = blue / 127.5f - 1f;
+                data[plane + index] = green / 127.5f - 1f;
+                data[2 * plane + index] = red / 127.5f - 1f;
             }
         }
 
@@ -355,6 +365,46 @@ public sealed class PaddleOcrProvider(AppDataPaths paths) : IOcrProvider, IDispo
         }
 
         return (result.ToString().Trim(), accepted == 0 ? 0 : confidence / accepted);
+    }
+
+    private static bool HasDarkBackground(SKBitmap bitmap)
+    {
+        if (bitmap.Width == 0 || bitmap.Height == 0)
+        {
+            return false;
+        }
+
+        var luminance = 0d;
+        var samples = 0;
+
+        void AddSample(int x, int y)
+        {
+            var color = bitmap.GetPixel(x, y);
+            luminance += 0.2126 * color.Red + 0.7152 * color.Green + 0.0722 * color.Blue;
+            samples++;
+        }
+
+        var horizontalStep = Math.Max(1, bitmap.Width / 64);
+        for (var x = 0; x < bitmap.Width; x += horizontalStep)
+        {
+            AddSample(x, 0);
+            if (bitmap.Height > 1)
+            {
+                AddSample(x, bitmap.Height - 1);
+            }
+        }
+
+        var verticalStep = Math.Max(1, bitmap.Height / 24);
+        for (var y = 1; y < bitmap.Height - 1; y += verticalStep)
+        {
+            AddSample(0, y);
+            if (bitmap.Width > 1)
+            {
+                AddSample(bitmap.Width - 1, y);
+            }
+        }
+
+        return samples > 0 && luminance / samples < 128;
     }
 
     private string? CharacterForIndex(int index)

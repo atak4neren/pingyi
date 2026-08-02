@@ -15,6 +15,7 @@
 - 新程序图标已接入 Windows 可执行文件、系统托盘与 Linux 桌面包。
 - Windows DPAPI、Linux Secret Service 凭据存储；默认不保存截图、原文或译文。
 - 已保存的凭据在设置中以首尾字符加星号显示，可按需显示明文、复制或从剪贴板粘贴；明文仍不写入 `settings.json`。
+- 标准包内置 CPU OCR 与 CPU Argos 翻译，不携带 NVIDIA/CUDA/cuDNN、AMD 或 Intel 专有 GPU 运行库；外部本机大模型服务仍可自行使用显卡加速。
 
 ## 开发运行
 
@@ -52,10 +53,11 @@ dotnet run --project src/PingYi.App/PingYi.App.csproj
 ```powershell
 dotnet test PingYi.slnx
 py -3 -m unittest discover -s engine_host -p "test_*.py"
-${env:PINGYI_RUN_MODEL_TESTS} = "1"
-dotnet test tests/PingYi.Core.Tests/PingYi.Core.Tests.csproj --filter Category=LocalModels
+.\scripts\run-quality-baseline.ps1 -ModelDirectory <离线模型目录>
 .\scripts\publish.ps1 -Runtime win-x64
 ```
+
+OCR 的固定场景分数、翻译对比和成品依赖审计见 [质量基线](docs/QUALITY_BASELINE.md)。
 
 Inno Setup 安装在自定义目录时，可向发布脚本传入 `-InnoCompiler "D:\path\to\ISCC.exe"`。
 
