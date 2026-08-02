@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=屏译
+GenericName=Screenshot Translator
+Comment=截图、提取并翻译屏幕文字
+Exec=pingyi
+Icon=pingyi
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+Keywords=OCR;Translate;Screenshot;

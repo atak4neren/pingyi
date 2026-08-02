@@ -1,0 +1,10 @@
+Package: pingyi
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: PingYi contributors
+Depends: libx11-6, libfontconfig1, libice6, libsm6, libsecret-tools
+Description: Screenshot OCR and translation utility
+ PingYi captures a selected screen region, recognizes Chinese or English text,
+ and translates it using local or user-configured cloud providers.

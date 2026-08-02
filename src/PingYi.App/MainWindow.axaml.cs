@@ -1,0 +1,1082 @@
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using PingYi.Core;
+using PingYi.Infrastructure;
+
+namespace PingYi.App;
+
+public partial class MainWindow : Window, IMainWindowShell
+{
+    private readonly AppServices? _services;
+    private readonly CaptureCoordinator? _captureCoordinator;
+    private readonly bool _settingsMode;
+    private readonly Dictionary<Button, object?> _buttonDefaultContents = [];
+    private readonly Dictionary<Button, bool> _buttonDefaultEnabledStates = [];
+    private readonly Dictionary<Button, CancellationTokenSource> _buttonFeedbackResetTokens = [];
+    private readonly Dictionary<string, SecretFieldState> _secretFields = new(StringComparer.Ordinal);
+    private DateTimeOffset _deleteConfirmationExpiresAt;
+    private object? _deleteModelsDefaultContent;
+    private bool _isLoadingSettings;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        _deleteModelsDefaultContent = DeleteModelsButton.Content;
+        RegisterSecretFields();
+    }
+
+    public MainWindow(
+        AppServices services,
+        CaptureCoordinator captureCoordinator,
+        bool settingsMode = false) : this()
+    {
+        _services = services;
+        _captureCoordinator = captureCoordinator;
+        _settingsMode = settingsMode;
+        ConfigureWindowMode();
+        LoadSettings();
+        Opened += async (_, _) =>
+        {
+            await RefreshCredentialStatusAsync();
+            await RefreshLocalModelStatusAsync();
+        };
+    }
+
+    public void SetGlobalStatus(string message, bool isError)
+    {
+        GlobalStatusText.Text = message;
+        GlobalStatusText.Foreground = isError
+            ? Application.Current?.FindResource("DangerTextBrush") as IBrush
+            : Application.Current?.FindResource("SecondaryTextBrush") as IBrush;
+        StatusIndicator.Background = Application.Current?.FindResource(
+            isError ? "DangerBrush" : "BrandBrush") as IBrush;
+        GlobalStatusBorder.Background = Application.Current?.FindResource(
+            isError ? "WarningBackgroundBrush" : "SubtleBackgroundBrush") as IBrush;
+    }
+
+    private void LoadSettings()
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        _isLoadingSettings = true;
+        try
+        {
+            var settings = _services.Settings;
+            OcrProviderCombo.ItemsSource = _services.Providers.OcrProviders
+                .Select(provider => new ProviderChoice(provider.Metadata.Id, provider.Metadata.DisplayName))
+                .ToArray();
+            TranslationProviderCombo.ItemsSource = _services.Providers.TranslationProviders
+                .Select(provider => new ProviderChoice(provider.Metadata.Id, provider.Metadata.DisplayName))
+                .ToArray();
+            OcrProviderCombo.SelectedItem = ((IEnumerable<ProviderChoice>)OcrProviderCombo.ItemsSource)
+                .FirstOrDefault(choice => choice.Id == settings.OcrProviderId);
+            TranslationProviderCombo.SelectedItem = ((IEnumerable<ProviderChoice>)TranslationProviderCombo.ItemsSource)
+                .FirstOrDefault(choice => choice.Id == settings.TranslationProviderId);
+            LocalServicePresetCombo.ItemsSource = LocalLlmPresets.All;
+            LocalServicePresetCombo.SelectedItem =
+                LocalLlmPresets.MatchEndpoint(settings.CustomTranslationEndpoint) ?? LocalLlmPresets.Default;
+            CustomEndpointBox.Text = settings.CustomTranslationEndpoint;
+            CustomModelBox.Text = settings.CustomTranslationModel;
+            InterfaceStyleCombo.ItemsSource = UiStyleChoice.All;
+            InterfaceStyleCombo.SelectedItem = UiStyleChoice.All
+                .First(choice => choice.Id == settings.InterfaceStyle);
+            HotkeyBox.Text = settings.Hotkey;
+            StartMinimizedCheckBox.IsChecked = settings.StartMinimized;
+            CheckForUpdatesCheckBox.IsChecked = settings.CheckForUpdates;
+        }
+        finally
+        {
+            _isLoadingSettings = false;
+        }
+
+        SetGlobalStatus($"就绪。按 {_services.Settings.Hotkey} 或点击“开始截图”。", isError: false);
+    }
+
+    private async void CaptureButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        CaptureButton.IsEnabled = false;
+        try
+        {
+            if (_captureCoordinator is not null)
+            {
+                await ApplyProviderSelectionAsync(showStatus: false);
+                await _captureCoordinator.StartCaptureAsync(this);
+            }
+        }
+        finally
+        {
+            CaptureButton.IsEnabled = true;
+        }
+    }
+
+    private async void SaveButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在保存…");
+        SetGlobalStatus("正在保存设置与安全凭据…", isError: false);
+        try
+        {
+            var previousSettings = _services.Settings;
+            var updatedSettings = BuildSettingsFromForm();
+            _ = GlobalHotkeyGesture.Parse(updatedSettings.Hotkey);
+            await SaveAllEnteredSecretsAsync();
+            var hotkeyChanged = !string.Equals(
+                previousSettings.Hotkey,
+                updatedSettings.Hotkey,
+                StringComparison.OrdinalIgnoreCase);
+            if (hotkeyChanged)
+            {
+                await SwitchHotkeyAsync(previousSettings.Hotkey, updatedSettings.Hotkey);
+            }
+
+            try
+            {
+                await _services.SaveSettingsAsync(updatedSettings);
+            }
+            catch
+            {
+                if (hotkeyChanged)
+                {
+                    await SwitchHotkeyAsync(updatedSettings.Hotkey, previousSettings.Hotkey);
+                }
+
+                throw;
+            }
+            ClearSecretInputs();
+            await RefreshCredentialStatusAsync();
+            var secretStatus = _services.SecretStore is PlatformSecretStore { IsPersistent: false }
+                ? "Linux 密钥服务不可用，凭据仅保存到本次运行结束。"
+                : "敏感凭据已写入系统安全存储。";
+            SetGlobalStatus($"设置已保存。{secretStatus}", isError: false);
+            FinishButtonOperation(button, "已保存并应用", success: true);
+        }
+        catch (Exception exception)
+        {
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "保存失败", success: false);
+        }
+    }
+
+    private async Task SwitchHotkeyAsync(string previousHotkey, string nextHotkey)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        await _services.HotkeyService.StopAsync();
+        try
+        {
+            await _services.HotkeyService.StartAsync(nextHotkey);
+        }
+        catch
+        {
+            await _services.HotkeyService.StopAsync();
+            await _services.HotkeyService.StartAsync(previousHotkey);
+            throw;
+        }
+    }
+
+    private async void ProviderCombo_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingSettings || _services is null ||
+            OcrProviderCombo.SelectedItem is not ProviderChoice ||
+            TranslationProviderCombo.SelectedItem is not ProviderChoice)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApplyProviderSelectionAsync(showStatus: true);
+        }
+        catch (Exception exception)
+        {
+            SetGlobalStatus(exception.Message, isError: true);
+        }
+    }
+
+    private async void CheckStatusButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在检查…");
+        SetGlobalStatus("正在检查引擎…", isError: false);
+        try
+        {
+            var ocr = _services.Providers.GetOcrProvider(
+                (OcrProviderCombo.SelectedItem as ProviderChoice)?.Id ?? _services.Settings.OcrProviderId);
+            var translation = _services.Providers.GetTranslationProvider(
+                (TranslationProviderCombo.SelectedItem as ProviderChoice)?.Id ?? _services.Settings.TranslationProviderId);
+            var ocrStatus = await ProbeOcrProviderAsync(ocr);
+            var translationStatus = await ProbeTranslationProviderAsync(translation);
+            var ready = ocrStatus.IsAvailable && translationStatus.IsAvailable;
+            SetGlobalStatus(
+                ready
+                    ? $"{ocr.Metadata.DisplayName}、{translation.Metadata.DisplayName}均可用。"
+                    : $"OCR：{ocrStatus.Message ?? "可用"}  翻译：{translationStatus.Message ?? "可用"}",
+                isError: !ready);
+            FinishButtonOperation(button, ready ? "状态正常" : "检查未通过", success: ready);
+        }
+        catch (Exception exception)
+        {
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "检查失败", success: false);
+        }
+    }
+
+    private async void ValidateBaiduCredentialsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在验证…");
+        SetGlobalStatus("正在安全保存并验证百度凭据…", isError: false);
+        try
+        {
+            await SaveBaiduSecretInputsAsync();
+            HideSecretFields(
+                SecretKeys.BaiduOcrApiKey,
+                SecretKeys.BaiduOcrSecretKey,
+                SecretKeys.BaiduTranslateAppId,
+                SecretKeys.BaiduTranslateSecret);
+
+            var ocrStatus = await _services.BaiduOcrProvider.GetAvailabilityAsync();
+            var translationStatus = await _services.BaiduTranslationProvider.GetAvailabilityAsync();
+            var anyConfigured = ocrStatus.IsAvailable || translationStatus.IsAvailable;
+            var allValid = true;
+
+            if (ocrStatus.IsAvailable)
+            {
+                try
+                {
+                    await _services.BaiduOcrProvider.ValidateCredentialsAsync();
+                    SetInlineStatus(BaiduOcrCredentialStatusText, "OCR 凭据：验证通过", "SuccessTextBrush");
+                }
+                catch (Exception exception)
+                {
+                    allValid = false;
+                    SetInlineStatus(BaiduOcrCredentialStatusText, $"OCR 凭据：{exception.Message}", "DangerTextBrush");
+                }
+            }
+            else
+            {
+                SetInlineStatus(BaiduOcrCredentialStatusText, "OCR 凭据：未完整配置，未发送验证", "WarningTextBrush");
+            }
+
+            if (translationStatus.IsAvailable)
+            {
+                try
+                {
+                    await _services.BaiduTranslationProvider.ValidateCredentialsAsync();
+                    SetInlineStatus(BaiduTranslationCredentialStatusText, "翻译凭据：验证通过", "SuccessTextBrush");
+                }
+                catch (Exception exception)
+                {
+                    allValid = false;
+                    SetInlineStatus(BaiduTranslationCredentialStatusText, $"翻译凭据：{exception.Message}", "DangerTextBrush");
+                }
+            }
+            else
+            {
+                SetInlineStatus(BaiduTranslationCredentialStatusText, "翻译凭据：未完整配置，未发送验证", "WarningTextBrush");
+            }
+
+            SetGlobalStatus(
+                !anyConfigured
+                    ? "尚未填写完整的百度 OCR 或翻译凭据。"
+                    : allValid
+                        ? "已配置的百度凭据均验证通过。"
+                        : "部分百度凭据验证失败，请查看字段下方提示。",
+                isError: !anyConfigured || !allValid);
+            FinishButtonOperation(
+                button,
+                anyConfigured && allValid ? "验证通过" : "验证未通过",
+                success: anyConfigured && allValid);
+        }
+        catch (Exception exception)
+        {
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "验证失败", success: false);
+        }
+    }
+
+    private async void UseLocalLlamaPresetButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        var presetSaved = false;
+        BeginButtonOperation(button, "正在应用并测试…");
+        try
+        {
+            var preset = LocalServicePresetCombo.SelectedItem as LocalLlmPreset ?? LocalLlmPresets.Default;
+            CustomEndpointBox.Text = preset.ChatCompletionsEndpoint;
+            CustomModelBox.Text = preset.SuggestedModel;
+            SelectTranslationProvider("custom-chat");
+            await _services.SaveSettingsAsync(BuildSettingsFromForm());
+            presetSaved = true;
+            SetInlineStatus(CustomTranslationStatusText, $"{preset.DisplayName} 预设已保存，正在发现可用模型…", "SecondaryTextBrush");
+            SetGlobalStatus($"{preset.DisplayName} 配置已应用，正在检查服务…", isError: false);
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                var models = await _services.CustomTranslationProvider.GetAvailableModelsAsync(timeout.Token);
+                if (models.Count > 0)
+                {
+                    CustomModelBox.Text = models[0];
+                    await _services.SaveSettingsAsync(BuildSettingsFromForm());
+                }
+            }
+            catch
+            {
+                // The connection test below provides the actionable provider-neutral error.
+            }
+            await TestCustomTranslationConnectionCoreAsync();
+            FinishButtonOperation(button, "预设已应用", success: true);
+        }
+        catch (Exception exception)
+        {
+            SetInlineStatus(CustomTranslationStatusText, exception.Message, "DangerTextBrush");
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, presetSaved ? "已应用，连接失败" : "应用失败", success: false);
+        }
+    }
+
+    private async void TestCustomTranslationButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在测试…");
+        try
+        {
+            await TestCustomTranslationConnectionCoreAsync();
+            FinishButtonOperation(button, "连接成功", success: true);
+        }
+        catch (Exception exception)
+        {
+            SetInlineStatus(CustomTranslationStatusText, exception.Message, "DangerTextBrush");
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "连接失败", success: false);
+        }
+    }
+
+    private async void InstallOcrModelsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在下载…");
+        SetInlineStatus(OcrModelStatusText, "OCR 模型：正在下载并校验…", "SecondaryTextBrush");
+        SetGlobalStatus("正在下载中英离线 OCR 模型，请勿退出…", isError: false);
+        try
+        {
+            await _services.PaddleProvider.InstallModelsAsync();
+            await RefreshLocalModelStatusAsync();
+            SetGlobalStatus("中英离线 OCR 模型安装完成并已校验。", isError: false);
+            FinishButtonOperation(button, "下载完成", success: true, isEnabledAfterResult: false);
+        }
+        catch (Exception exception)
+        {
+            SetInlineStatus(OcrModelStatusText, $"OCR 模型：{exception.Message}", "DangerTextBrush");
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "下载失败", success: false);
+        }
+    }
+
+    private async void InstallTranslationModelsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var button = sender as Button;
+        BeginButtonOperation(button, "正在下载…");
+        SetInlineStatus(TranslationModelStatusText, "翻译模型：正在下载并校验…", "SecondaryTextBrush");
+        SetGlobalStatus("正在下载中英离线翻译模型，请勿退出…", isError: false);
+        try
+        {
+            await _services.ArgosProvider.InstallModelsAsync();
+            await RefreshLocalModelStatusAsync();
+            SetGlobalStatus("中英离线翻译模型安装完成并已校验。", isError: false);
+            FinishButtonOperation(button, "下载完成", success: true, isEnabledAfterResult: false);
+        }
+        catch (Exception exception)
+        {
+            SetInlineStatus(TranslationModelStatusText, $"翻译模型：{exception.Message}", "DangerTextBrush");
+            SetGlobalStatus(exception.Message, isError: true);
+            FinishButtonOperation(button, "下载失败", success: false);
+        }
+    }
+
+    private async void DeleteModelsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (now > _deleteConfirmationExpiresAt)
+        {
+            _deleteConfirmationExpiresAt = now.AddSeconds(8);
+            DeleteModelsButton.Content = "确认清理下载模型";
+            SetGlobalStatus("再次点击可清理用户下载的翻译模型；安装包内离线基础模型、凭据和设置都会保留。", isError: false);
+            _ = ResetDeleteConfirmationAsync(_deleteConfirmationExpiresAt);
+            return;
+        }
+
+        try
+        {
+            DeleteModelsButton.IsEnabled = false;
+            await _services.ClearDownloadedTranslationModelsAsync();
+            await RefreshLocalModelStatusAsync();
+            SetGlobalStatus("用户下载模型已清理，安装包内离线基础模型仍可使用。", isError: false);
+        }
+        catch (Exception exception)
+        {
+            SetGlobalStatus(exception.Message, isError: true);
+        }
+        finally
+        {
+            DeleteModelsButton.IsEnabled = true;
+            _deleteConfirmationExpiresAt = default;
+            DeleteModelsButton.Content = _deleteModelsDefaultContent;
+        }
+    }
+
+    private async Task ResetDeleteConfirmationAsync(DateTimeOffset expiresAt)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(8));
+        if (_deleteConfirmationExpiresAt == expiresAt && DateTimeOffset.UtcNow >= expiresAt)
+        {
+            _deleteConfirmationExpiresAt = default;
+            DeleteModelsButton.Content = _deleteModelsDefaultContent;
+            SetGlobalStatus("删除操作已取消。", isError: false);
+        }
+    }
+
+    private AppSettings BuildSettingsFromForm()
+    {
+        var current = _services?.Settings ?? new AppSettings();
+        return current with
+        {
+            OcrProviderId = (OcrProviderCombo.SelectedItem as ProviderChoice)?.Id ?? "local-paddle",
+            TranslationProviderId = (TranslationProviderCombo.SelectedItem as ProviderChoice)?.Id ?? "local-argos",
+            CustomTranslationEndpoint = CustomEndpointBox.Text ?? string.Empty,
+            CustomTranslationModel = CustomModelBox.Text ?? string.Empty,
+            Hotkey = HotkeyBox.Text ?? AppSettings.DefaultHotkey,
+            StartMinimized = StartMinimizedCheckBox.IsChecked == true,
+            CheckForUpdates = CheckForUpdatesCheckBox.IsChecked != false,
+            InterfaceStyle = (InterfaceStyleCombo.SelectedItem as UiStyleChoice)?.Id ?? "modern"
+        };
+    }
+
+    private void ConfigureWindowMode()
+    {
+        if (_settingsMode)
+        {
+            Title = "屏译设置";
+            WindowHeadingText.Text = "设置";
+            WindowSubtitleText.Text = "处理、模型、服务、快捷键与外观";
+            CaptureHero.IsVisible = false;
+            OpenClassicInterfaceButton.IsEnabled = true;
+            OpenClassicInterfaceButton.Content = "打开经典界面";
+            return;
+        }
+
+        OpenClassicInterfaceButton.IsEnabled = false;
+        OpenClassicInterfaceButton.Content = "当前为经典界面";
+    }
+
+    private async void OpenClassicInterfaceButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_services is null || _captureCoordinator is null || !_settingsMode)
+        {
+            return;
+        }
+
+        var classicWindow = new MainWindow(_services, _captureCoordinator);
+        await classicWindow.ShowDialog(this);
+        LoadSettings();
+        await RefreshCredentialStatusAsync();
+        await RefreshLocalModelStatusAsync();
+    }
+
+    private async Task ApplyProviderSelectionAsync(bool showStatus)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var ocr = OcrProviderCombo.SelectedItem as ProviderChoice;
+        var translation = TranslationProviderCombo.SelectedItem as ProviderChoice;
+        if (ocr is null || translation is null)
+        {
+            return;
+        }
+
+        await _services.SaveSettingsAsync(_services.Settings with
+        {
+            OcrProviderId = ocr.Id,
+            TranslationProviderId = translation.Id
+        });
+        if (showStatus)
+        {
+            SetGlobalStatus($"已应用：{ocr.Name} + {translation.Name}。", isError: false);
+        }
+    }
+
+    private static async Task<ProviderAvailability> ProbeOcrProviderAsync(IOcrProvider provider)
+    {
+        try
+        {
+            var availability = await provider.GetAvailabilityAsync();
+            if (availability.IsAvailable && provider is BaiduOcrProvider baidu)
+            {
+                await baidu.ValidateCredentialsAsync();
+            }
+
+            return availability;
+        }
+        catch (Exception exception)
+        {
+            return new ProviderAvailability(false, exception.Message);
+        }
+    }
+
+    private static async Task<ProviderAvailability> ProbeTranslationProviderAsync(ITranslationProvider provider)
+    {
+        try
+        {
+            var availability = await provider.GetAvailabilityAsync();
+            if (availability.IsAvailable && provider is BaiduTranslationProvider baidu)
+            {
+                await baidu.ValidateCredentialsAsync();
+            }
+
+            return availability;
+        }
+        catch (Exception exception)
+        {
+            return new ProviderAvailability(false, exception.Message);
+        }
+    }
+
+    private async Task TestCustomTranslationConnectionCoreAsync()
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        SetInlineStatus(CustomTranslationStatusText, "正在连接并发送固定测试文本…", "SecondaryTextBrush");
+        await PersistSecretFieldAsync(SecretKeys.CustomTranslationApiKey);
+        SelectTranslationProvider("custom-chat");
+        await _services.SaveSettingsAsync(BuildSettingsFromForm());
+        HideSecretFields(SecretKeys.CustomTranslationApiKey);
+
+        var availability = await _services.CustomTranslationProvider.GetAvailabilityAsync();
+        if (!availability.IsAvailable)
+        {
+            throw new ProviderException("custom_unavailable", availability.Message ?? "大模型服务不可用。");
+        }
+
+        var result = await _services.CustomTranslationProvider.TranslateAsync(
+            new TranslationRequest("Hello", "en", "zh"));
+        if (string.IsNullOrWhiteSpace(result.Text))
+        {
+            throw new ProviderException("custom_empty", "服务已连接，但没有返回测试译文。");
+        }
+
+        SetInlineStatus(CustomTranslationStatusText, "连接、模型名与翻译请求均验证通过", "SuccessTextBrush");
+        SetGlobalStatus("本地 / 自定义大模型翻译已可用。", isError: false);
+    }
+
+    private async Task RefreshLocalModelStatusAsync()
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        SetInlineStatus(OcrModelStatusText, "OCR 模型：正在检查…", "SecondaryTextBrush");
+        SetInlineStatus(TranslationModelStatusText, "翻译模型：正在检查…", "SecondaryTextBrush");
+
+        var ocrAvailability = await _services.PaddleProvider.GetAvailabilityAsync();
+        SetInlineStatus(
+            OcrModelStatusText,
+            ocrAvailability.IsAvailable
+                ? "OCR 模型：已安装，可离线使用"
+                : $"OCR 模型：{ocrAvailability.Message ?? "不可用"}",
+            ocrAvailability.IsAvailable ? "SuccessTextBrush" : "WarningTextBrush");
+        SetModelInstallButtonState(
+            InstallOcrModelsButton,
+            OcrModelButtonText,
+            OcrModelDownloadIcon,
+            OcrModelInstalledIcon,
+            ocrAvailability.IsAvailable,
+            "下载中英 OCR 模型",
+            "中英 OCR 模型已安装");
+
+        var translationAvailability = await _services.ArgosProvider.GetAvailabilityAsync();
+        SetInlineStatus(
+            TranslationModelStatusText,
+            translationAvailability.IsAvailable
+                ? "翻译模型：已安装，可离线使用"
+                : $"翻译模型：{translationAvailability.Message ?? "不可用"}",
+            translationAvailability.IsAvailable ? "SuccessTextBrush" : "WarningTextBrush");
+        SetModelInstallButtonState(
+            InstallTranslationModelsButton,
+            TranslationModelButtonText,
+            TranslationModelDownloadIcon,
+            TranslationModelInstalledIcon,
+            translationAvailability.IsAvailable,
+            "下载中英翻译模型",
+            "中英翻译模型已安装");
+    }
+
+    private async Task RefreshCredentialStatusAsync()
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var ocrApiKey = await _services.SecretStore.GetAsync(SecretKeys.BaiduOcrApiKey);
+            var ocrSecret = await _services.SecretStore.GetAsync(SecretKeys.BaiduOcrSecretKey);
+            var translationAppId = await _services.SecretStore.GetAsync(SecretKeys.BaiduTranslateAppId);
+            var translationSecret = await _services.SecretStore.GetAsync(SecretKeys.BaiduTranslateSecret);
+            var customApiKey = await _services.SecretStore.GetAsync(SecretKeys.CustomTranslationApiKey);
+            SetSecretFieldValue(SecretKeys.BaiduOcrApiKey, ocrApiKey);
+            SetSecretFieldValue(SecretKeys.BaiduOcrSecretKey, ocrSecret);
+            SetSecretFieldValue(SecretKeys.BaiduTranslateAppId, translationAppId);
+            SetSecretFieldValue(SecretKeys.BaiduTranslateSecret, translationSecret);
+            SetSecretFieldValue(SecretKeys.CustomTranslationApiKey, customApiKey);
+            var ocrReady = !string.IsNullOrWhiteSpace(ocrApiKey) && !string.IsNullOrWhiteSpace(ocrSecret);
+            var translationReady = !string.IsNullOrWhiteSpace(translationAppId) && !string.IsNullOrWhiteSpace(translationSecret);
+
+            SetInlineStatus(
+                BaiduOcrCredentialStatusText,
+                ocrReady ? "OCR 凭据：已安全保存" : "OCR 凭据：未配置或缺少一项",
+                ocrReady ? "SuccessTextBrush" : "WarningTextBrush");
+            SetInlineStatus(
+                BaiduTranslationCredentialStatusText,
+                translationReady ? "翻译凭据：已安全保存" : "翻译凭据：未配置或缺少一项",
+                translationReady ? "SuccessTextBrush" : "WarningTextBrush");
+        }
+        catch (Exception exception)
+        {
+            SetInlineStatus(BaiduOcrCredentialStatusText, $"读取凭据失败：{exception.Message}", "DangerTextBrush");
+            SetInlineStatus(BaiduTranslationCredentialStatusText, "翻译凭据状态未知", "DangerTextBrush");
+        }
+    }
+
+    private async Task SaveAllEnteredSecretsAsync()
+    {
+        await SaveBaiduSecretInputsAsync();
+        await PersistSecretFieldAsync(SecretKeys.CustomTranslationApiKey);
+    }
+
+    private async Task SaveBaiduSecretInputsAsync()
+    {
+        await PersistSecretFieldAsync(SecretKeys.BaiduOcrApiKey);
+        await PersistSecretFieldAsync(SecretKeys.BaiduOcrSecretKey);
+        await PersistSecretFieldAsync(SecretKeys.BaiduTranslateAppId);
+        await PersistSecretFieldAsync(SecretKeys.BaiduTranslateSecret);
+    }
+
+    private void SelectTranslationProvider(string providerId)
+    {
+        if (TranslationProviderCombo.ItemsSource is not IEnumerable<ProviderChoice> choices)
+        {
+            return;
+        }
+
+        _isLoadingSettings = true;
+        try
+        {
+            TranslationProviderCombo.SelectedItem = choices.FirstOrDefault(choice => choice.Id == providerId);
+        }
+        finally
+        {
+            _isLoadingSettings = false;
+        }
+    }
+
+    private static void SetInlineStatus(TextBlock textBlock, string message, string brushKey)
+    {
+        textBlock.Text = message;
+        textBlock.Foreground = Application.Current?.FindResource(brushKey) as IBrush;
+    }
+
+    private void BeginButtonOperation(Button? button, string message)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        if (!_buttonDefaultContents.ContainsKey(button))
+        {
+            _buttonDefaultContents[button] = button.Content;
+        }
+
+        if (!_buttonDefaultEnabledStates.ContainsKey(button))
+        {
+            _buttonDefaultEnabledStates[button] = button.IsEnabled;
+        }
+
+        CancelButtonFeedbackReset(button);
+        SetButtonFeedbackClass(button, "feedback-loading");
+        button.Content = message;
+        button.IsEnabled = false;
+    }
+
+    private void FinishButtonOperation(
+        Button? button,
+        string message,
+        bool success,
+        bool isEnabledAfterResult = true)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        CancelButtonFeedbackReset(button);
+        SetButtonFeedbackClass(button, success ? "feedback-success" : "feedback-error");
+        button.Content = message;
+        button.IsEnabled = isEnabledAfterResult;
+
+        var cancellation = new CancellationTokenSource();
+        _buttonFeedbackResetTokens[button] = cancellation;
+        _ = ResetButtonFeedbackAsync(button, cancellation);
+    }
+
+    private async Task ResetButtonFeedbackAsync(Button button, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4), cancellation.Token);
+            if (!cancellation.IsCancellationRequested)
+            {
+                SetButtonFeedbackClass(button, className: null);
+                if (_buttonDefaultContents.TryGetValue(button, out var defaultContent))
+                {
+                    button.Content = defaultContent;
+                }
+
+                if (_buttonDefaultEnabledStates.TryGetValue(button, out var isEnabled))
+                {
+                    button.IsEnabled = isEnabled;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A new operation replaced this button's previous feedback.
+        }
+        finally
+        {
+            if (_buttonFeedbackResetTokens.TryGetValue(button, out var current) &&
+                ReferenceEquals(current, cancellation))
+            {
+                _buttonFeedbackResetTokens.Remove(button);
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
+    private void CancelButtonFeedbackReset(Button button)
+    {
+        if (_buttonFeedbackResetTokens.Remove(button, out var cancellation))
+        {
+            cancellation.Cancel();
+        }
+    }
+
+    private static void SetButtonFeedbackClass(Button button, string? className)
+    {
+        button.Classes.Remove("feedback-loading");
+        button.Classes.Remove("feedback-success");
+        button.Classes.Remove("feedback-error");
+        if (className is not null)
+        {
+            button.Classes.Add(className);
+        }
+    }
+
+    private void SetModelInstallButtonState(
+        Button button,
+        TextBlock label,
+        PathIcon downloadIcon,
+        PathIcon installedIcon,
+        bool isInstalled,
+        string downloadText,
+        string installedText)
+    {
+        label.Text = isInstalled ? installedText : downloadText;
+        AutomationProperties.SetName(button, label.Text);
+        downloadIcon.IsVisible = !isInstalled;
+        installedIcon.IsVisible = isInstalled;
+
+        if (isInstalled)
+        {
+            if (!button.Classes.Contains("model-installed"))
+            {
+                button.Classes.Add("model-installed");
+            }
+        }
+        else
+        {
+            button.Classes.Remove("model-installed");
+        }
+
+        _buttonDefaultEnabledStates[button] = !isInstalled;
+        if (!HasButtonFeedback(button))
+        {
+            button.IsEnabled = !isInstalled;
+        }
+    }
+
+    private static bool HasButtonFeedback(Button button) =>
+        button.Classes.Contains("feedback-loading") ||
+        button.Classes.Contains("feedback-success") ||
+        button.Classes.Contains("feedback-error");
+
+    private void ClearSecretInputs()
+    {
+        HideSecretFields(_secretFields.Keys.ToArray());
+    }
+
+    private void RegisterSecretFields()
+    {
+        RegisterSecretField(SecretKeys.BaiduOcrApiKey, "OCR API Key", BaiduOcrApiKeyBox);
+        RegisterSecretField(SecretKeys.BaiduOcrSecretKey, "OCR Secret Key", BaiduOcrSecretBox);
+        RegisterSecretField(SecretKeys.BaiduTranslateAppId, "翻译 APP ID", BaiduTranslateAppIdBox);
+        RegisterSecretField(SecretKeys.BaiduTranslateSecret, "翻译密钥", BaiduTranslateSecretBox);
+        RegisterSecretField(SecretKeys.CustomTranslationApiKey, "兼容接口 API Key", CustomApiKeyBox);
+    }
+
+    private void RegisterSecretField(string key, string displayName, TextBox textBox)
+    {
+        _secretFields[key] = new SecretFieldState(key, displayName, textBox);
+        RenderSecretField(_secretFields[key]);
+    }
+
+    private void SetSecretFieldValue(string key, string? value)
+    {
+        if (!_secretFields.TryGetValue(key, out var state))
+        {
+            return;
+        }
+
+        state.Value = value?.Trim() ?? string.Empty;
+        state.OriginalValue = state.Value;
+        state.IsDirty = false;
+        state.IsRevealed = false;
+        RenderSecretField(state);
+    }
+
+    private void ToggleSecretVisibility_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetSecretField(sender, out var state))
+        {
+            return;
+        }
+
+        SyncSecretFieldFromEditor(state);
+        state.IsRevealed = !state.IsRevealed;
+        RenderSecretField(state);
+        if (state.IsRevealed)
+        {
+            state.TextBox.Focus();
+            state.TextBox.CaretIndex = state.TextBox.Text?.Length ?? 0;
+        }
+
+        SetGlobalStatus(
+            state.IsRevealed ? $"{state.DisplayName} 已显示，可直接编辑或粘贴。" : $"{state.DisplayName} 已隐藏。",
+            isError: false);
+    }
+
+    private async void CopySecretButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetSecretField(sender, out var state))
+        {
+            return;
+        }
+
+        SyncSecretFieldFromEditor(state);
+        if (string.IsNullOrWhiteSpace(state.Value))
+        {
+            SetGlobalStatus($"{state.DisplayName} 尚未填写，无法复制。", isError: true);
+            return;
+        }
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            SetGlobalStatus("当前系统剪贴板不可用。", isError: true);
+            return;
+        }
+
+        await clipboard.SetTextAsync(state.Value);
+        SetGlobalStatus($"{state.DisplayName} 已复制到剪贴板。", isError: false);
+    }
+
+    private async void PasteSecretButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetSecretField(sender, out var state))
+        {
+            return;
+        }
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        var value = clipboard is null ? null : await clipboard.TryGetTextAsync();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            SetGlobalStatus("剪贴板中没有可粘贴的文本。", isError: true);
+            return;
+        }
+
+        state.Value = value.Trim();
+        state.IsDirty = !string.Equals(state.Value, state.OriginalValue, StringComparison.Ordinal);
+        state.IsRevealed = false;
+        RenderSecretField(state);
+        SetGlobalStatus($"{state.DisplayName} 已粘贴，点击“保存并应用”后写入系统安全存储。", isError: false);
+    }
+
+    private async Task PersistSecretFieldAsync(string key)
+    {
+        if (_services is null || !_secretFields.TryGetValue(key, out var state))
+        {
+            return;
+        }
+
+        SyncSecretFieldFromEditor(state);
+        if (!state.IsDirty)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(state.Value))
+        {
+            await _services.SecretStore.DeleteAsync(key);
+        }
+        else
+        {
+            await _services.SecretStore.SetAsync(key, state.Value);
+        }
+
+        state.OriginalValue = state.Value;
+        state.IsDirty = false;
+        state.IsRevealed = false;
+        RenderSecretField(state);
+    }
+
+    private void HideSecretFields(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (!_secretFields.TryGetValue(key, out var state))
+            {
+                continue;
+            }
+
+            SyncSecretFieldFromEditor(state);
+            state.IsRevealed = false;
+            RenderSecretField(state);
+        }
+    }
+
+    private bool TryGetSecretField(object? sender, out SecretFieldState state)
+    {
+        if (sender is Button { Tag: string key } && _secretFields.TryGetValue(key, out var found))
+        {
+            state = found;
+            return true;
+        }
+
+        state = null!;
+        return false;
+    }
+
+    private static void SyncSecretFieldFromEditor(SecretFieldState state)
+    {
+        if (!state.IsRevealed)
+        {
+            return;
+        }
+
+        state.Value = state.TextBox.Text?.Trim() ?? string.Empty;
+        state.IsDirty = !string.Equals(state.Value, state.OriginalValue, StringComparison.Ordinal);
+    }
+
+    private static void RenderSecretField(SecretFieldState state)
+    {
+        state.TextBox.IsReadOnly = !state.IsRevealed;
+        state.TextBox.Text = state.IsRevealed ? state.Value : SecretDisplay.Mask(state.Value);
+    }
+
+    private sealed record ProviderChoice(string Id, string Name)
+    {
+        public override string ToString() => Name;
+    }
+
+    private sealed record UiStyleChoice(string Id, string Name)
+    {
+        public static IReadOnlyList<UiStyleChoice> All { get; } =
+        [
+            new("modern", "新版精简主界面"),
+            new("classic", "经典完整界面")
+        ];
+
+        public override string ToString() => Name;
+    }
+
+    private sealed class SecretFieldState(string key, string displayName, TextBox textBox)
+    {
+        public string Key { get; } = key;
+        public string DisplayName { get; } = displayName;
+        public TextBox TextBox { get; } = textBox;
+        public string Value { get; set; } = string.Empty;
+        public string OriginalValue { get; set; } = string.Empty;
+        public bool IsDirty { get; set; }
+        public bool IsRevealed { get; set; }
+    }
+}

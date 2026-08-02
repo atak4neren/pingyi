@@ -1,0 +1,13 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <x:String x:Key="String.AppName">屏译</x:String>
+  <x:String x:Key="String.AppTagline">截图、识别、翻译，一次完成</x:String>
+  <x:String x:Key="String.StartCapture">开始截图</x:String>
+  <x:String x:Key="String.ResultTitle">识别结果</x:String>
+  <x:String x:Key="String.CopySource">复制原文</x:String>
+  <x:String x:Key="String.CopyTranslation">复制译文</x:String>
+  <x:String x:Key="String.CopyAll">复制全部</x:String>
+  <x:String x:Key="String.Retry">重新处理</x:String>
+  <x:String x:Key="String.OpenSettings">打开设置</x:String>
+  <x:String x:Key="String.Close">关闭</x:String>
+</ResourceDictionary>

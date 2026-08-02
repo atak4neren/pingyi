@@ -1,0 +1,473 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PingYi.App.MainWindow"
+        x:Name="RootWindow"
+        Title="屏译"
+        Width="920"
+        Height="700"
+        MinWidth="760"
+        MinHeight="520"
+        WindowStartupLocation="CenterScreen">
+  <Window.Styles>
+    <Style Selector="Button.secret-action">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="9" />
+    </Style>
+  </Window.Styles>
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+    <Grid Margin="24" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="2,0,2,2">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <Border Width="44" Height="44" CornerRadius="13" Background="{DynamicResource BrandBrush}">
+            <Grid>
+              <PathIcon Width="24" Height="24" Foreground="White"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Data="M5 7V5H7 M17 5H19V7 M19 17V19H17 M7 19H5V17 M8 9H16 M8 13H15 M8 17H12" />
+            </Grid>
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <TextBlock x:Name="WindowHeadingText" Text="{DynamicResource String.AppName}"
+                       FontSize="21" FontWeight="Bold" />
+            <TextBlock x:Name="WindowSubtitleText" Text="{DynamicResource String.AppTagline}"
+                       Classes="muted" FontSize="12" />
+          </StackPanel>
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="chip" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Border Width="7" Height="7" CornerRadius="4" Background="{DynamicResource SuccessBrush}"
+                    VerticalAlignment="Center" />
+            <TextBlock Text="本地优先 · 默认不留历史" Classes="muted"
+                       FontSize="12" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border x:Name="CaptureHero" Grid.Row="1" Classes="card" Background="{DynamicResource HeroBackgroundBrush}"
+              Padding="24" ClipToBounds="True">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="28">
+          <StackPanel Spacing="9" VerticalAlignment="Center">
+            <TextBlock Text="CAPTURE · OCR · TRANSLATE" Classes="eyebrow" />
+            <TextBlock Text="框选一下，立即读懂屏幕文字"
+                       FontSize="25" FontWeight="Bold" LetterSpacing="-0.4" />
+            <TextBlock Text="截图仅在内存中处理。识别完成后可复制原文、译文，或固定结果卡继续对照。"
+                       Classes="muted" FontSize="13" TextWrapping="Wrap" MaxWidth="560" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+              <TextBlock Text="全局快捷键" Classes="tertiary" FontSize="11"
+                         VerticalAlignment="Center" Margin="0,0,2,0" />
+              <Border Classes="chip" Padding="8,4">
+                <TextBlock Text="Ctrl" FontFamily="Consolas" FontSize="11" FontWeight="SemiBold" />
+              </Border>
+              <TextBlock Text="+" Classes="tertiary" VerticalAlignment="Center" />
+              <Border Classes="chip" Padding="8,4">
+                <TextBlock Text="Alt" FontFamily="Consolas" FontSize="11" FontWeight="SemiBold" />
+              </Border>
+              <TextBlock Text="+" Classes="tertiary" VerticalAlignment="Center" />
+              <Border Classes="chip" Padding="8,4">
+                <TextBlock Text="D" FontFamily="Consolas" FontSize="11" FontWeight="SemiBold" />
+              </Border>
+            </StackPanel>
+          </StackPanel>
+
+          <Button Grid.Column="1" x:Name="CaptureButton" Classes="cta"
+                  MinWidth="160" VerticalAlignment="Center"
+                  Click="CaptureButton_OnClick"
+                  AutomationProperties.Name="开始截图翻译">
+            <StackPanel Orientation="Horizontal" Spacing="9">
+              <PathIcon Classes="icon" Foreground="White"
+                        Data="M4 8V5A1 1 0 0 1 5 4H8 M16 4H19A1 1 0 0 1 20 5V8 M20 16V19A1 1 0 0 1 19 20H16 M8 20H5A1 1 0 0 1 4 19V16 M8 10H16 M8 14H14" />
+              <TextBlock Text="{DynamicResource String.StartCapture}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2" Classes="card">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Text="处理引擎" Classes="section-title" />
+              <TextBlock Text="本地与云端服务可以分别组合" Classes="muted" FontSize="12" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="ghost" Click="CheckStatusButton_OnClick"
+                    AutomationProperties.Name="检查处理引擎状态">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <PathIcon Classes="icon" Data="M20 11A8 8 0 1 0 18 16 M20 11V5 M20 11H14" />
+                <TextBlock Text="检查状态" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
+
+          <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="12">
+            <Border Classes="subtle-card">
+              <StackPanel Spacing="7">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="28" Height="28" CornerRadius="8" Background="#180D9488">
+                    <PathIcon Width="15" Height="15" Foreground="{DynamicResource BrandBrush}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M5 4H19V18H9L5 22V4 M9 8H15 M9 12H17" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="文字识别" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Text="处理所选区域图片" Classes="tertiary" FontSize="10" />
+                  </StackPanel>
+                </StackPanel>
+                <ComboBox x:Name="OcrProviderCombo" MinHeight="42"
+                          SelectionChanged="ProviderCombo_OnSelectionChanged"
+                          AutomationProperties.Name="文字识别提供商" />
+                <TextBlock Text="选择云端 OCR 时，仅上传本次框选图片。"
+                           Classes="tertiary" FontSize="11" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Classes="subtle-card">
+              <StackPanel Spacing="7">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="28" Height="28" CornerRadius="8" Background="#18EA580C">
+                    <PathIcon Width="15" Height="15" Foreground="{DynamicResource ActionBrush}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M4 5H11 M7.5 3V5 M5 9C7 12 9 13 11 14 M10 7C9 10 7 12 4 14 M14 20L17 12L20 20 M15 17H19" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="翻译方式" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Text="处理识别后的文字" Classes="tertiary" FontSize="10" />
+                  </StackPanel>
+                </StackPanel>
+                <ComboBox x:Name="TranslationProviderCombo" MinHeight="42"
+                          SelectionChanged="ProviderCombo_OnSelectionChanged"
+                          AutomationProperties.Name="翻译提供商" />
+                <TextBlock Text="选择云端翻译时，只发送识别后的纯文字。"
+                           Classes="tertiary" FontSize="11" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="3" Classes="card">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="18">
+          <Grid ColumnDefinitions="240,*" ColumnSpacing="20">
+            <StackPanel Spacing="12">
+              <StackPanel Spacing="2">
+                <TextBlock Text="本地模型" Classes="section-title" />
+                <TextBlock Text="标准版随安装包提供离线基础模型；每次加载都会校验完整性。"
+                           Classes="muted" FontSize="11" TextWrapping="Wrap" />
+              </StackPanel>
+
+              <StackPanel Spacing="5">
+                <Button x:Name="InstallOcrModelsButton" Classes="secondary"
+                        HorizontalContentAlignment="Left"
+                        Click="InstallOcrModelsButton_OnClick"
+                        AutomationProperties.Name="下载中英文字识别模型">
+                  <StackPanel Orientation="Horizontal" Spacing="9">
+                    <PathIcon x:Name="OcrModelDownloadIcon" Classes="icon"
+                              Data="M12 3V15 M7 10L12 15L17 10 M5 20H19" />
+                    <PathIcon x:Name="OcrModelInstalledIcon" Classes="icon" IsVisible="False"
+                              Data="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59Z" />
+                    <TextBlock x:Name="OcrModelButtonText" Text="下载中英 OCR 模型"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <TextBlock x:Name="OcrModelStatusText" Text="OCR 模型：正在检查…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Margin="4,0,0,0" AutomationProperties.LiveSetting="Polite" />
+              </StackPanel>
+
+              <StackPanel Spacing="5">
+                <Button x:Name="InstallTranslationModelsButton" Classes="secondary"
+                        HorizontalContentAlignment="Left"
+                        Click="InstallTranslationModelsButton_OnClick"
+                        AutomationProperties.Name="下载中英离线翻译模型">
+                  <StackPanel Orientation="Horizontal" Spacing="9">
+                    <PathIcon x:Name="TranslationModelDownloadIcon" Classes="icon"
+                              Data="M12 3V15 M7 10L12 15L17 10 M5 20H19" />
+                    <PathIcon x:Name="TranslationModelInstalledIcon" Classes="icon" IsVisible="False"
+                              Data="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59Z" />
+                    <TextBlock x:Name="TranslationModelButtonText" Text="下载中英翻译模型"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <TextBlock x:Name="TranslationModelStatusText" Text="翻译模型：正在检查…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Margin="4,0,0,0" AutomationProperties.LiveSetting="Polite" />
+              </StackPanel>
+
+              <Button x:Name="DeleteModelsButton" Classes="danger-ghost"
+                      HorizontalContentAlignment="Left"
+                      Click="DeleteModelsButton_OnClick"
+                      AutomationProperties.Name="清理用户下载的翻译模型">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <PathIcon Classes="icon" Data="M4 7H20 M9 7V4H15V7 M7 7L8 20H16L17 7 M10 11V16 M14 11V16" />
+                  <TextBlock Text="清理下载模型" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+
+              <Border Classes="subtle-card" Padding="12">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}"
+                            Data="M12 3L20 7V12C20 17 16.5 20 12 21C7.5 20 4 17 4 12V7L12 3 M8 12L11 15L16 9" />
+                  <TextBlock Text="截图、正文与密钥不会写入日志"
+                             Classes="muted" FontSize="10" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <Border Grid.Column="1" BorderBrush="{DynamicResource DividerBrush}"
+                    BorderThickness="1,0,0,0" Padding="20,0,0,0">
+              <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="云端与自定义服务" Classes="section-title" />
+                  <TextBlock Text="密钥交由系统安全存储，不写入 settings.json。"
+                             Classes="muted" FontSize="11" />
+                </StackPanel>
+
+                <Expander Header="百度 OCR 与翻译凭据" IsExpanded="True">
+                  <Grid Margin="0,12,0,0" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                        ColumnSpacing="12" RowSpacing="10">
+                    <StackPanel Spacing="5">
+                      <TextBlock Text="OCR API Key" Classes="field-label" />
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                        <TextBox x:Name="BaiduOcrApiKeyBox" IsReadOnly="True"
+                                 PlaceholderText="尚未保存"
+                                 AutomationProperties.Name="百度 OCR API Key" />
+                        <Button Grid.Column="1" Classes="ghost secret-action"
+                                Tag="baidu-ocr-api-key" Click="ToggleSecretVisibility_OnClick"
+                                ToolTip.Tip="显示或隐藏" AutomationProperties.Name="显示或隐藏 OCR API Key">
+                          <PathIcon Classes="icon" Data="M2 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 22 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2 12 M12 9A3 3 0 1 0 12 15A3 3 0 1 0 12 9" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost secret-action"
+                                Tag="baidu-ocr-api-key" Click="CopySecretButton_OnClick"
+                                ToolTip.Tip="复制" AutomationProperties.Name="复制 OCR API Key">
+                          <PathIcon Classes="icon" Data="M8 8H19V19H8V8 M5 5H16V8 M5 5V16H8" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost secret-action"
+                                Tag="baidu-ocr-api-key" Click="PasteSecretButton_OnClick"
+                                ToolTip.Tip="粘贴" AutomationProperties.Name="粘贴 OCR API Key">
+                          <PathIcon Classes="icon" Data="M9 5V3H15V5 M7 5H17V21H7V5 M10 10H14 M10 14H15" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="5">
+                      <TextBlock Text="OCR Secret Key" Classes="field-label" />
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                        <TextBox x:Name="BaiduOcrSecretBox" IsReadOnly="True"
+                                 PlaceholderText="尚未保存"
+                                 AutomationProperties.Name="百度 OCR Secret Key" />
+                        <Button Grid.Column="1" Classes="ghost secret-action"
+                                Tag="baidu-ocr-secret-key" Click="ToggleSecretVisibility_OnClick"
+                                ToolTip.Tip="显示或隐藏" AutomationProperties.Name="显示或隐藏 OCR Secret Key">
+                          <PathIcon Classes="icon" Data="M2 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 22 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2 12 M12 9A3 3 0 1 0 12 15A3 3 0 1 0 12 9" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost secret-action"
+                                Tag="baidu-ocr-secret-key" Click="CopySecretButton_OnClick"
+                                ToolTip.Tip="复制" AutomationProperties.Name="复制 OCR Secret Key">
+                          <PathIcon Classes="icon" Data="M8 8H19V19H8V8 M5 5H16V8 M5 5V16H8" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost secret-action"
+                                Tag="baidu-ocr-secret-key" Click="PasteSecretButton_OnClick"
+                                ToolTip.Tip="粘贴" AutomationProperties.Name="粘贴 OCR Secret Key">
+                          <PathIcon Classes="icon" Data="M9 5V3H15V5 M7 5H17V21H7V5 M10 10H14 M10 14H15" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Spacing="5">
+                      <TextBlock Text="翻译 APP ID" Classes="field-label" />
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                        <TextBox x:Name="BaiduTranslateAppIdBox" IsReadOnly="True"
+                                 PlaceholderText="尚未保存"
+                                 AutomationProperties.Name="百度翻译 APP ID" />
+                        <Button Grid.Column="1" Classes="ghost secret-action"
+                                Tag="baidu-translate-app-id" Click="ToggleSecretVisibility_OnClick"
+                                ToolTip.Tip="显示或隐藏" AutomationProperties.Name="显示或隐藏翻译 APP ID">
+                          <PathIcon Classes="icon" Data="M2 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 22 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2 12 M12 9A3 3 0 1 0 12 15A3 3 0 1 0 12 9" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost secret-action"
+                                Tag="baidu-translate-app-id" Click="CopySecretButton_OnClick"
+                                ToolTip.Tip="复制" AutomationProperties.Name="复制翻译 APP ID">
+                          <PathIcon Classes="icon" Data="M8 8H19V19H8V8 M5 5H16V8 M5 5V16H8" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost secret-action"
+                                Tag="baidu-translate-app-id" Click="PasteSecretButton_OnClick"
+                                ToolTip.Tip="粘贴" AutomationProperties.Name="粘贴翻译 APP ID">
+                          <PathIcon Classes="icon" Data="M9 5V3H15V5 M7 5H17V21H7V5 M10 10H14 M10 14H15" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="5">
+                      <TextBlock Text="翻译密钥" Classes="field-label" />
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                        <TextBox x:Name="BaiduTranslateSecretBox" IsReadOnly="True"
+                                 PlaceholderText="尚未保存"
+                                 AutomationProperties.Name="百度翻译密钥" />
+                        <Button Grid.Column="1" Classes="ghost secret-action"
+                                Tag="baidu-translate-secret" Click="ToggleSecretVisibility_OnClick"
+                                ToolTip.Tip="显示或隐藏" AutomationProperties.Name="显示或隐藏翻译密钥">
+                          <PathIcon Classes="icon" Data="M2 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 22 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2 12 M12 9A3 3 0 1 0 12 15A3 3 0 1 0 12 9" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost secret-action"
+                                Tag="baidu-translate-secret" Click="CopySecretButton_OnClick"
+                                ToolTip.Tip="复制" AutomationProperties.Name="复制翻译密钥">
+                          <PathIcon Classes="icon" Data="M8 8H19V19H8V8 M5 5H16V8 M5 5V16H8" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost secret-action"
+                                Tag="baidu-translate-secret" Click="PasteSecretButton_OnClick"
+                                ToolTip.Tip="粘贴" AutomationProperties.Name="粘贴翻译密钥">
+                          <PathIcon Classes="icon" Data="M9 5V3H15V5 M7 5H17V21H7V5 M10 10H14 M10 14H15" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Classes="inline-status">
+                      <StackPanel Spacing="4">
+                        <TextBlock x:Name="BaiduOcrCredentialStatusText"
+                                   Text="OCR 凭据：正在检查安全存储…"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <TextBlock x:Name="BaiduTranslationCredentialStatusText"
+                                   Text="翻译凭据：正在检查安全存储…"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite" />
+                      </StackPanel>
+                    </Border>
+                    <Button Grid.Row="3" Grid.Column="1" x:Name="ValidateBaiduCredentialsButton"
+                            Classes="secondary" Content="保存并验证凭据"
+                            HorizontalAlignment="Right"
+                            Click="ValidateBaiduCredentialsButton_OnClick"
+                            AutomationProperties.Name="保存并验证百度凭据" />
+                  </Grid>
+                </Expander>
+
+                <Expander Header="自定义兼容翻译接口">
+                  <Grid Margin="0,12,0,0" ColumnDefinitions="2*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                        ColumnSpacing="12" RowSpacing="10">
+                    <StackPanel Grid.ColumnSpan="2" Spacing="5">
+                      <TextBlock Text="服务预设" Classes="field-label" />
+                      <ComboBox x:Name="LocalServicePresetCombo"
+                                AutomationProperties.Name="本机大模型服务预设" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Spacing="5">
+                      <TextBlock Text="服务地址" Classes="field-label" />
+                      <TextBox x:Name="CustomEndpointBox"
+                               PlaceholderText="http://127.0.0.1:8080/v1/chat/completions"
+                               AutomationProperties.Name="兼容翻译服务地址" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="5">
+                      <TextBlock Text="模型名" Classes="field-label" />
+                      <TextBox x:Name="CustomModelBox" PlaceholderText="例如 gemma-4-e4b-it"
+                               AutomationProperties.Name="兼容翻译模型名" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="5">
+                      <TextBlock Text="API Key" Classes="field-label" />
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                        <TextBox x:Name="CustomApiKeyBox" IsReadOnly="True"
+                                 PlaceholderText="本地无鉴权服务可留空"
+                                 AutomationProperties.Name="兼容翻译接口 API Key" />
+                        <Button Grid.Column="1" Classes="ghost secret-action"
+                                Tag="custom-translation-api-key" Click="ToggleSecretVisibility_OnClick"
+                                ToolTip.Tip="显示或隐藏" AutomationProperties.Name="显示或隐藏兼容接口 API Key">
+                          <PathIcon Classes="icon" Data="M2 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 22 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2 12 M12 9A3 3 0 1 0 12 15A3 3 0 1 0 12 9" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost secret-action"
+                                Tag="custom-translation-api-key" Click="CopySecretButton_OnClick"
+                                ToolTip.Tip="复制" AutomationProperties.Name="复制兼容接口 API Key">
+                          <PathIcon Classes="icon" Data="M8 8H19V19H8V8 M5 5H16V8 M5 5V16H8" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost secret-action"
+                                Tag="custom-translation-api-key" Click="PasteSecretButton_OnClick"
+                                ToolTip.Tip="粘贴" AutomationProperties.Name="粘贴兼容接口 API Key">
+                          <PathIcon Classes="icon" Data="M9 5V3H15V5 M7 5H17V21H7V5 M10 10H14 M10 14H15" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Classes="inline-status">
+                      <TextBlock x:Name="CustomTranslationStatusText"
+                                 Text="支持 llama.cpp、Ollama、LM Studio、vLLM 及其他 OpenAI 兼容服务。"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"
+                                 FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 AutomationProperties.LiveSetting="Polite" />
+                    </Border>
+                    <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Spacing="8">
+                      <Button x:Name="UseLocalLlamaPresetButton" Classes="secondary" Content="应用服务预设"
+                              Click="UseLocalLlamaPresetButton_OnClick"
+                              AutomationProperties.Name="应用本机大模型服务预设" />
+                      <Button x:Name="TestCustomTranslationButton" Classes="secondary" Content="测试连接"
+                              Click="TestCustomTranslationButton_OnClick"
+                              AutomationProperties.Name="测试本地或自定义翻译接口" />
+                    </StackPanel>
+                  </Grid>
+                </Expander>
+
+                <Expander Header="外观、快捷键与启动">
+                  <Grid Margin="0,12,0,0" ColumnDefinitions="*,*"
+                        RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                    <StackPanel Spacing="5">
+                      <TextBlock Text="主界面样式" Classes="field-label" />
+                      <ComboBox x:Name="InterfaceStyleCombo"
+                                AutomationProperties.Name="主界面样式" />
+                      <TextBlock Text="切换后重新启动屏译生效；经典完整界面会继续保留。"
+                                 Classes="tertiary" FontSize="10" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="5">
+                      <TextBlock Text="全局快捷键" Classes="field-label" />
+                      <TextBox x:Name="HotkeyBox" PlaceholderText="Ctrl+Alt+D"
+                               AutomationProperties.Name="全局截图快捷键" />
+                      <TextBlock Text="保存后立即重新注册；冲突时会在当前窗口提示。"
+                                 Classes="tertiary" FontSize="10" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="8">
+                      <CheckBox x:Name="StartMinimizedCheckBox" Content="启动后最小化到托盘"
+                                AutomationProperties.Name="启动后最小化到托盘" />
+                      <CheckBox x:Name="CheckForUpdatesCheckBox" Content="检查并提示可用的新版本"
+                                AutomationProperties.Name="检查应用更新" />
+                    </StackPanel>
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" Classes="inline-status">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="3" VerticalAlignment="Center">
+                          <TextBlock Text="经典完整界面" FontWeight="SemiBold" FontSize="12" />
+                          <TextBlock Text="保留旧版完整页面，便于对照或恢复熟悉的工作方式。"
+                                     Classes="tertiary" FontSize="10" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" x:Name="OpenClassicInterfaceButton"
+                                Classes="secondary" Content="打开经典界面"
+                                Click="OpenClassicInterfaceButton_OnClick"
+                                AutomationProperties.Name="打开经典完整界面" />
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </Expander>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="14">
+            <Border x:Name="GlobalStatusBorder" Background="{DynamicResource SubtleBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="10" Padding="12,9" MinHeight="46">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
+                <Border x:Name="StatusIndicator" Width="8" Height="8" CornerRadius="4"
+                        Background="{DynamicResource BrandBrush}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" x:Name="GlobalStatusText" Text="正在初始化…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           AutomationProperties.LiveSetting="Polite" />
+              </Grid>
+            </Border>
+            <Button Grid.Column="1" x:Name="SaveSettingsButton" Classes="primary" Content="保存并应用"
+                    MinWidth="112" Click="SaveButton_OnClick"
+                    AutomationProperties.Name="保存所有设置" />
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+  </ScrollViewer>
+</Window>
