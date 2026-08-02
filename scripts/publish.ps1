@@ -16,6 +16,7 @@ if ($Version.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) {
 }
 $output = Join-Path $projectRoot "artifacts\publish\$Runtime-$Version"
 $engineOutput = Join-Path $projectRoot "artifacts\engine-host\$Runtime"
+$engineVenv = Join-Path $projectRoot ".venv-engine"
 $engineExecutable = if ($Runtime -eq "win-x64") {
     Join-Path $engineOutput "pingyi-engine\pingyi-engine.exe"
 } else {
@@ -72,6 +73,12 @@ if ([string]::IsNullOrWhiteSpace($OfflineModelSource)) {
         -Destination $offlineModelTarget
 }
 if ($LASTEXITCODE -ne 0) { throw "Failed to prepare offline baseline models." }
+
+Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $output -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "THIRD_PARTY_NOTICES.md") -Destination $output -Force
+& (Join-Path $engineVenv "Scripts\python.exe") `
+    (Join-Path $PSScriptRoot "audit-release-dependencies.py") $output
+if ($LASTEXITCODE -ne 0) { throw "The release dependency audit failed." }
 
 $archive = Join-Path $projectRoot "artifacts\PingYi-$Version-$Runtime.zip"
 Compress-Archive -Path (Join-Path $output "*") -DestinationPath $archive -Force

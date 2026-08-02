@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to place in the package names
+        required: true
+        default: 0.1.0
 
 permissions:
   contents: write
@@ -21,9 +27,14 @@ jobs:
       - name: Build Windows release
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "${{ inputs.version }}"
+          } else {
+            "${{ github.ref_name }}".TrimStart("v")
+          }
           ./scripts/setup-engine.ps1 -Python python
           python ./scripts/download-offline-models.py --destination ./artifacts/model-source
+          ./scripts/run-quality-baseline.ps1 -ModelDirectory ./artifacts/model-source
           choco install innosetup --yes --no-progress
           $env:PATH += ";C:\Program Files (x86)\Inno Setup 6"
           ./scripts/publish.ps1 -Runtime win-x64 -Version $version `
@@ -50,7 +61,11 @@ jobs:
       - name: Build Linux release
         run: |
           chmod +x scripts/*.sh
-          version="${GITHUB_REF_NAME#v}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
           ./scripts/setup-engine.sh
           python scripts/download-offline-models.py --destination artifacts/model-source
           ./scripts/build-engine.sh
@@ -63,6 +78,7 @@ jobs:
             artifacts/PingYi-*-linux-x64.deb
 
   publish:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
@@ -70,6 +86,8 @@ jobs:
         with:
           path: release-files
           merge-multiple: true
+      - name: Generate checksums
+        run: sha256sum release-files/* > release-files/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true

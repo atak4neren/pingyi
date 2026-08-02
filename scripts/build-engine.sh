@@ -14,9 +14,9 @@ fi
 "$engine_python" -m PyInstaller --noconfirm --clean --onedir \
   --name pingyi-engine \
   --runtime-hook "$project_root/engine_host/runtime_minimal.py" \
+  --additional-hooks-dir "$project_root/packaging/pyinstaller" \
   --collect-data argostranslate \
   --copy-metadata argostranslate \
-  --collect-binaries ctranslate2 \
   --copy-metadata ctranslate2 \
   --exclude-module torch \
   --exclude-module ctranslate2.converters \
@@ -54,5 +54,8 @@ fi
   --workpath "$project_root/artifacts/pyinstaller-work-linux" \
   --specpath "$project_root/artifacts" \
   "$project_root/engine_host/main.py"
+
+"$engine_python" "$project_root/scripts/audit-release-dependencies.py" \
+  "$output_dir/pingyi-engine"
 
 echo "Local engine: $output_dir/pingyi-engine"

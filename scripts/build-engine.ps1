@@ -16,9 +16,9 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to install PyInstaller." }
 & $enginePython -m PyInstaller --noconfirm --clean --onedir `
     --name pingyi-engine `
     --runtime-hook (Join-Path $projectRoot "engine_host\runtime_minimal.py") `
+    --additional-hooks-dir (Join-Path $projectRoot "packaging\pyinstaller") `
     --collect-data argostranslate `
     --copy-metadata argostranslate `
-    --collect-binaries ctranslate2 `
     --copy-metadata ctranslate2 `
     --exclude-module torch `
     --exclude-module ctranslate2.converters `
@@ -57,3 +57,7 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to install PyInstaller." }
     --specpath (Join-Path $projectRoot "artifacts") `
     (Join-Path $projectRoot "engine_host\main.py")
 if ($LASTEXITCODE -ne 0) { throw "Failed to build the local engine." }
+
+& $enginePython (Join-Path $PSScriptRoot "audit-release-dependencies.py") `
+    (Join-Path $projectRoot "artifacts\engine-host\win-x64\pingyi-engine")
+if ($LASTEXITCODE -ne 0) { throw "The local engine dependency audit failed." }
